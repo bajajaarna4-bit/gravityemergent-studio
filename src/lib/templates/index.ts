@@ -3,6 +3,7 @@ import { quickCommerceSpec, quickCommerceFiles } from "./quick-commerce";
 import { cinematicStreamSpec, cinematicStreamFiles } from "./cinematic-stream";
 import { videoPlatformSpec, videoPlatformFiles } from "./video-platform";
 import { socialFeedSpec, socialFeedFiles } from "./social-feed";
+import { portfolioSpec, portfolioFiles } from "./portfolio";
 import { saasModernSpec, saasModernFiles } from "./saas-modern";
 
 export interface TemplateDefinition {
@@ -58,6 +59,16 @@ export const TEMPLATES: TemplateDefinition[] = [
     files: socialFeedFiles,
   },
   {
+    id: "portfolio",
+    genre: "portfolio",
+    name: "Vance Visuals (Creative Portfolio)",
+    description: "Editorial photography portfolio with Leica EXIF metadata, fullscreen lightbox, and commission inquiry.",
+    badge: "Fine-Art",
+    previewThumbnail: "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=600&q=80",
+    spec: portfolioSpec,
+    files: portfolioFiles,
+  },
+  {
     id: "saas-modern",
     genre: "saas",
     name: "NexusAI (Developer SaaS)",
@@ -85,9 +96,11 @@ export function detectGenreFromPrompt(prompt: string): SiteGenre {
   if (lower.includes("video") || lower.includes("youtube") || lower.includes("vlog") || lower.includes("channel") || lower.includes("watch")) {
     return "video";
   }
-  if (lower.includes("social") || lower.includes("instagram") || lower.includes("photo") || lower.includes("stories") || lower.includes("feed") || lower.includes("community")) {
+  if (lower.includes("social") || lower.includes("instagram") || lower.includes("photo sharing") || lower.includes("stories") || lower.includes("feed") || lower.includes("community")) {
     return "social";
+  }
+  if (lower.includes("portfolio") || lower.includes("photographer") || lower.includes("photography") || lower.includes("artist") || lower.includes("designer")) {
+    return "portfolio";
   }
   return "saas";
 }
-

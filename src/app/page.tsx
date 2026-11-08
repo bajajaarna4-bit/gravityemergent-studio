@@ -15,12 +15,12 @@ import {
   VersionSnapshot, 
   ClickToEditTarget 
 } from "@/lib/types";
-import { TEMPLATES, getTemplateByGenre, detectGenreFromPrompt } from "@/lib/templates";
-import { generateInitialPlan, simulateAgentWorkflow } from "@/lib/agents/orchestrator";
+import { TEMPLATES } from "@/lib/templates";
+import { generateInitialPlan } from "@/lib/agents/orchestrator";
+import { classifyGenre } from "@/lib/llm/agents";
 import { generateId } from "@/lib/utils";
 
 export default function Home() {
-  // App views: "landing" | "workspace"
   const [view, setView] = useState<"landing" | "workspace">("landing");
 
   // State
@@ -36,8 +36,181 @@ export default function Home() {
   const [snapshots, setSnapshots] = useState<VersionSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Real Multi-Agent Generator via Server-Sent Events (POST /api/generate)
+  const generateWithRealAI = async (promptText: string, planOverride?: ProjectSpec) => {
+    setIsLoading(true);
+    setView("workspace");
+
+    const genre = classifyGenre(promptText);
+    const placeholderPlan = planOverride || generateInitialPlan(promptText, modelSettings);
+    setActiveSpec(placeholderPlan);
+
+    // Initial chat message
+    setMessages([
+      {
+        id: generateId("msg"),
+        sender: "assistant",
+        content: `Initializing 5 autonomous AI agents for: **"${promptText}"**...\n- Archetype: **${genre.toUpperCase()}**\n- Model: **${modelSettings.modelId}**`,
+        timestamp: Date.now(),
+      },
+    ]);
+
+    setActivities([]);
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(modelSettings.apiKey ? { "x-api-key": modelSettings.apiKey } : {}),
+        },
+        body: JSON.stringify({
+          prompt: promptText,
+          model: modelSettings.modelId,
+          temperature: modelSettings.temperature,
+          apiKey: modelSettings.apiKey,
+        }),
+      });
+
+      if (!response.ok && !response.body) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            const jsonStr = trimmed.replace(/^data: /, "");
+
+            try {
+              const data = JSON.parse(jsonStr);
+
+              if (data.type === "agent_activity" && data.event) {
+                const actItem: AgentActivityItem = {
+                  id: generateId("act"),
+                  agent: data.event.agent,
+                  timestamp: Date.now(),
+                  status: data.event.type === "agent_done" ? "completed" : "working",
+                  title: data.event.title,
+                  detail: data.event.detail,
+                };
+                setActivities((prev) => [actItem, ...prev]);
+              }
+
+              if (data.type === "complete" && data.result) {
+                const { plan, designTokens, databaseTables, files: genFiles } = data.result;
+
+                const fileMap: VirtualFileMap = {};
+                for (const f of genFiles) {
+                  fileMap[f.path] = {
+                    path: f.path,
+                    content: f.content,
+                    language: f.path.endsWith(".json") ? "json" : "javascript",
+                  };
+                }
+
+                const finalSpec: ProjectSpec = {
+                  id: generateId("spec"),
+                  name: plan.name,
+                  tagline: plan.tagline,
+                  genre: plan.genre,
+                  summary: plan.summary,
+                  pages: plan.pages,
+                  components: plan.components,
+                  features: plan.features,
+                  tokens: designTokens,
+                  databaseTables: databaseTables || [],
+                  approved: true,
+                };
+
+                setActiveSpec(finalSpec);
+                setFiles(fileMap);
+
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: generateId("msg"),
+                    sender: "assistant",
+                    content: `🎉 **${plan.name}** is live!\n- **Sitemap**: ${plan.pages.join(", ")}\n- **Components**: ${plan.components.slice(0, 4).join(", ")}\n- **Database**: ${databaseTables?.length || 0} collections seeded.\nClick any element in the preview with **Click-to-Edit** or chat to refine!`,
+                    timestamp: Date.now(),
+                    affectedFiles: ["/App.js"],
+                  },
+                ]);
+
+                setSnapshots([
+                  {
+                    id: generateId("snap"),
+                    timestamp: Date.now(),
+                    label: "v1.0 — Real AI Generation",
+                    promptDescription: promptText,
+                    files: fileMap,
+                  },
+                ]);
+              }
+
+              if (data.type === "error") {
+                throw new Error(data.error);
+              }
+            } catch (err: any) {
+              console.warn("SSE event parsing:", err);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("Real AI generation error:", err);
+
+      const errorMessage = err.message || "Failed to complete AI synthesis.";
+      const isMissingKey = errorMessage.includes("API_KEY_MISSING");
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId("msg"),
+          sender: "assistant",
+          content: isMissingKey
+            ? `⚠️ **API Key Missing**: To enable real LLM generation, please set \`GEMINI_API_KEY\` or \`ANTHROPIC_API_KEY\` in your \`.env\` file, or enter it in the **AI Studio Settings** drawer. Loaded genre template as fallback.`
+            : `⚠️ **Notice**: ${errorMessage}. Loaded fallback engine so you can continue building.`,
+          timestamp: Date.now(),
+        },
+      ]);
+
+      // Fallback to genre-aware template if API key is not configured yet
+      const baseTemplate = TEMPLATES.find((t) => t.genre === genre) || TEMPLATES[0];
+      setActiveSpec({ ...baseTemplate.spec, approved: true });
+      setFiles(baseTemplate.files);
+      setSnapshots([
+        {
+          id: generateId("snap"),
+          timestamp: Date.now(),
+          label: "v1.0 — Fallback Generation",
+          promptDescription: promptText,
+          files: baseTemplate.files,
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle prompt submission from landing page
-  const handleStartBuild = (prompt: string) => {
+  const handleStartBuild = (prompt: string, instant = false) => {
+    if (instant) {
+      generateWithRealAI(prompt);
+      return;
+    }
     const initialPlan = generateInitialPlan(prompt, modelSettings);
     setActiveSpec(initialPlan);
     setIsPlanApprovalOpen(true);
@@ -48,23 +221,15 @@ export default function Home() {
     const tmpl = TEMPLATES.find((t) => t.id === templateId) || TEMPLATES[0];
     const initialPlan = { ...tmpl.spec, approved: true };
     setActiveSpec(initialPlan);
+    setFiles(tmpl.files);
 
-    // Run agents
-    const { files: initialFiles, stream } = simulateAgentWorkflow(
-      `Generate ${tmpl.name}`,
-      initialPlan
-    );
-
-    setFiles(initialFiles);
-    setActivities(stream);
     setMessages([
       {
         id: generateId("msg"),
         sender: "assistant",
-        content: `I've initialized **${initialPlan.name}** with the **${initialPlan.genre}** genre engine. All pages, data fixtures, and components are live in the preview. Try clicking any element with Click-to-Edit or tell me what to refine!`,
+        content: `Loaded **${tmpl.name}** (${tmpl.genre} engine). Click any element with **Click-to-Edit** or chat to customize!`,
         timestamp: Date.now(),
         affectedFiles: ["/App.js"],
-        agentSteps: stream,
       },
     ]);
 
@@ -72,9 +237,9 @@ export default function Home() {
       {
         id: generateId("snap"),
         timestamp: Date.now(),
-        label: "v1.0 — Initial Generation",
-        promptDescription: `Autonomous synthesis for ${initialPlan.name}`,
-        files: initialFiles,
+        label: `v1.0 — ${tmpl.name}`,
+        promptDescription: tmpl.description,
+        files: tmpl.files,
       },
     ]);
 
@@ -84,43 +249,11 @@ export default function Home() {
   // Handle Plan Approval
   const handleApprovePlan = (approvedSpec: ProjectSpec) => {
     setIsPlanApprovalOpen(false);
-    setActiveSpec(approvedSpec);
-    setIsLoading(true);
-
-    const { files: initialFiles, stream } = simulateAgentWorkflow(
-      approvedSpec.summary,
-      approvedSpec
-    );
-
-    setFiles(initialFiles);
-    setActivities(stream);
-    setMessages([
-      {
-        id: generateId("msg"),
-        sender: "assistant",
-        content: `🚀 All 6 subagents have completed execution for **${approvedSpec.name}**!\n- **Planner**: Scaffolded ${approvedSpec.pages.length} pages\n- **Designer**: Tokens applied (${approvedSpec.tokens.mood})\n- **Frontend**: Responsive React & Tailwind compiled\n- **Backend**: ${approvedSpec.databaseTables.length} relational tables seeded\n- **QA & Fixer**: Layout verified across mobile & desktop.`,
-        timestamp: Date.now(),
-        affectedFiles: ["/App.js"],
-        agentSteps: stream,
-      },
-    ]);
-
-    setSnapshots([
-      {
-        id: generateId("snap"),
-        timestamp: Date.now(),
-        label: "v1.0 — Approved Plan Build",
-        promptDescription: `Plan approved: ${approvedSpec.name}`,
-        files: initialFiles,
-      },
-    ]);
-
-    setIsLoading(false);
-    setView("workspace");
+    generateWithRealAI(approvedSpec.summary, approvedSpec);
   };
 
-  // Handle Chat Edits from Studio
-  const handleSendMessage = (userPrompt: string, targetedElement?: ClickToEditTarget) => {
+  // Handle Chat Edits & Click-to-Edit from Studio (POST /api/chat)
+  const handleSendMessage = async (userPrompt: string, targetedElement?: ClickToEditTarget) => {
     const userMsg: ChatMessage = {
       id: generateId("msg"),
       sender: "user",
@@ -131,28 +264,92 @@ export default function Home() {
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
-    // Autonomous agent patching simulation
-    setTimeout(() => {
+    try {
+      const currentCode = files["/App.js"]?.content || "";
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(modelSettings.apiKey ? { "x-api-key": modelSettings.apiKey } : {}),
+        },
+        body: JSON.stringify({
+          userPrompt,
+          currentCode,
+          targetedElement,
+          model: modelSettings.modelId,
+          apiKey: modelSettings.apiKey,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.updatedCode) {
+        const updatedFiles: VirtualFileMap = {
+          ...files,
+          "/App.js": {
+            path: "/App.js",
+            language: "javascript",
+            content: data.updatedCode,
+            isModified: true,
+          },
+        };
+
+        setFiles(updatedFiles);
+
+        // Add QA/Fixer activity
+        const fixActivity: AgentActivityItem = {
+          id: generateId("act"),
+          agent: "fixer",
+          timestamp: Date.now(),
+          status: "completed",
+          title: targetedElement
+            ? `Fixer Patched <${targetedElement.tagName}>`
+            : "Differential Update Applied to /App.js",
+          detail: data.summary || `Updated code responding to: "${userPrompt}"`,
+        };
+        setActivities((prev) => [fixActivity, ...prev]);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateId("msg"),
+            sender: "assistant",
+            content: targetedElement
+              ? `I've updated the <${targetedElement.tagName}> component according to your instruction. Live in preview!`
+              : `Applied updates for "${userPrompt}". /App.js re-compiled.`,
+            timestamp: Date.now(),
+            affectedFiles: ["/App.js"],
+            targetedElement,
+          },
+        ]);
+
+        // Add version snapshot
+        setSnapshots((prev) => [
+          {
+            id: generateId("snap"),
+            timestamp: Date.now(),
+            label: `v1.${prev.length} — ${userPrompt.slice(0, 24)}...`,
+            promptDescription: userPrompt,
+            files: updatedFiles,
+          },
+          ...prev,
+        ]);
+      } else {
+        throw new Error(data.error || "Failed to patch code.");
+      }
+    } catch (err: any) {
+      console.warn("Real chat edit fallback:", err);
+
+      // Client-side targeted fallback if API key is not yet set
       let currentApp = files["/App.js"]?.content || "";
       const lower = userPrompt.toLowerCase();
 
-      // Apply realistic code modifications
       if (lower.includes("darker") || lower.includes("dark")) {
         currentApp = currentApp.replace(/bg-\[#.*?\]/g, "bg-[#050507]");
-        currentApp = currentApp.replace(/from-black\/[0-9]+/g, "from-black/95");
       }
       if (lower.includes("emerald") || lower.includes("green")) {
-        currentApp = currentApp.replace(/from-red-600/g, "from-emerald-600");
-        currentApp = currentApp.replace(/bg-red-600/g, "bg-emerald-500");
-        currentApp = currentApp.replace(/text-red-500/g, "text-emerald-400");
-        currentApp = currentApp.replace(/border-red-500/g, "border-emerald-500");
-      }
-      if (lower.includes("indigo") || lower.includes("purple") || lower.includes("blue")) {
-        currentApp = currentApp.replace(/bg-emerald-500/g, "bg-indigo-600");
-        currentApp = currentApp.replace(/text-emerald-400/g, "text-indigo-400");
-      }
-      if (targetedElement && lower.includes("badge")) {
-        currentApp = currentApp.replace(/10 MIN/g, "PRIORITY 10 MIN");
+        currentApp = currentApp.replace(/from-red-600/g, "from-emerald-600").replace(/bg-red-600/g, "bg-emerald-500").replace(/text-red-500/g, "text-emerald-400");
       }
 
       const updatedFiles: VirtualFileMap = {
@@ -167,46 +364,19 @@ export default function Home() {
 
       setFiles(updatedFiles);
 
-      // Add agent activity item
-      const fixActivity: AgentActivityItem = {
-        id: generateId("act"),
-        agent: "fixer",
-        timestamp: Date.now(),
-        status: "completed",
-        title: targetedElement
-          ? `Targeted Patch Applied to <${targetedElement.tagName}>`
-          : "Differential Update Applied to /App.js",
-        detail: `Updated styling tokens and state handlers responding to prompt: "${userPrompt}". Verified responsive bounds.`,
-      };
-      setActivities((prev) => [fixActivity, ...prev]);
-
-      // Add assistant response
-      const assistantMsg: ChatMessage = {
-        id: generateId("msg"),
-        sender: "assistant",
-        content: targetedElement
-          ? `I've updated the <${targetedElement.tagName}> component according to your instruction. The changes are immediately live in the preview!`
-          : `I've updated the design and components to match "${userPrompt}". The differential patch has been applied to **/App.js**.`,
-        timestamp: Date.now(),
-        affectedFiles: ["/App.js"],
-        targetedElement,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-
-      // Create snapshot
-      setSnapshots((prev) => [
-        {
-          id: generateId("snap"),
-          timestamp: Date.now(),
-          label: `v1.${prev.length} — ${userPrompt.slice(0, 24)}...`,
-          promptDescription: userPrompt,
-          files: updatedFiles,
-        },
+      setMessages((prev) => [
         ...prev,
+        {
+          id: generateId("msg"),
+          sender: "assistant",
+          content: `Notice: ${err.message}. To use real LLM code patching, configure your GEMINI_API_KEY or ANTHROPIC_API_KEY in AI Studio drawer.`,
+          timestamp: Date.now(),
+          affectedFiles: ["/App.js"],
+        },
       ]);
-
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   // Restore snapshot
@@ -309,4 +479,3 @@ export default function Home() {
     </main>
   );
 }
-

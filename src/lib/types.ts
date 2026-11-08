@@ -86,6 +86,7 @@ export interface ModelSettings {
   systemPrompt: string;
   creativityLevel: "balanced" | "strict" | "creative" | "experimental";
   tokenBudget: number;
+  apiKey?: string;
 }
 
 export interface VersionSnapshot {

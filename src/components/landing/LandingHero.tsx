@@ -2,14 +2,12 @@
 
 import React, { useState } from "react";
 import { 
-  Sparkles, ArrowRight, Sliders, Bot, Zap, Film, 
-  Tv, Heart, Shield, Code, ChevronRight, Play, CheckCircle2
+  Sparkles, ArrowRight, Sliders, Rocket, FileText, CheckCircle2
 } from "lucide-react";
-import { SiteGenre, ModelSettings } from "@/lib/types";
-import { TEMPLATES } from "@/lib/templates";
+import { ModelSettings } from "@/lib/types";
 
 interface LandingHeroProps {
-  onStartBuild: (prompt: string) => void;
+  onStartBuild: (prompt: string, instant?: boolean) => void;
   onSelectTemplate: (templateId: string) => void;
   onOpenAIStudio: () => void;
   modelSettings: ModelSettings;
@@ -31,15 +29,20 @@ export function LandingHero({
 }: LandingHeroProps) {
   const [prompt, setPrompt] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleInstantSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
-    onStartBuild(prompt);
+    onStartBuild(prompt, true);
+  };
+
+  const handleReviewPlanSubmit = () => {
+    if (!prompt.trim()) return;
+    onStartBuild(prompt, false);
   };
 
   const handleChipClick = (chipPrompt: string) => {
     setPrompt(chipPrompt);
-    onStartBuild(chipPrompt);
+    onStartBuild(chipPrompt, true);
   };
 
   return (
@@ -69,7 +72,7 @@ export function LandingHero({
         </div>
 
         {/* Big Prompt Box */}
-        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
+        <form onSubmit={handleInstantSubmit} className="max-w-2xl mx-auto">
           <div className="relative bg-[#0d0d12]/90 border border-zinc-700/80 hover:border-zinc-500/80 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl transition-all glow-blue group">
             <textarea
               rows={3}
@@ -79,7 +82,7 @@ export function LandingHero({
               className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 px-3 py-2 resize-none focus:outline-none leading-relaxed"
             />
 
-            <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 px-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 px-2">
               <button
                 type="button"
                 onClick={onOpenAIStudio}
@@ -89,14 +92,26 @@ export function LandingHero({
                 <span className="font-medium font-mono text-[11px]">{modelSettings.modelId}</span>
               </button>
 
-              <button
-                type="submit"
-                disabled={!prompt.trim()}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 active:scale-95"
-              >
-                <span>Generate Plan</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={handleReviewPlanSubmit}
+                  disabled={!prompt.trim()}
+                  className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-200 hover:text-white font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all border border-zinc-700"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Review Plan</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={!prompt.trim()}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-blue-600/30 active:scale-95"
+                >
+                  <Rocket className="w-3.5 h-3.5" />
+                  <span>Build & Live Preview</span>
+                </button>
+              </div>
             </div>
           </div>
         </form>
@@ -104,16 +119,16 @@ export function LandingHero({
         {/* Example Prompt Chips */}
         <div className="space-y-2">
           <div className="text-[11px] text-zinc-500 font-mono uppercase tracking-wider">
-            Inspiration Starters
+            Inspiration Starters (Click to generate live prototype)
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
             {EXAMPLE_CHIPS.map((chip, idx) => (
               <button
                 key={idx}
                 onClick={() => handleChipClick(chip.prompt)}
-                className="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 text-xs px-3.5 py-1.5 rounded-full transition-all hover:scale-105 active:scale-95"
+                className="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 text-xs px-3.5 py-1.5 rounded-full transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
               >
-                {chip.label}
+                <span>{chip.label}</span>
               </button>
             ))}
           </div>
@@ -153,4 +168,3 @@ export function LandingHero({
     </div>
   );
 }
-

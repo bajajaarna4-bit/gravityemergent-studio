@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Sliders, Sparkles, Cpu, X, HelpCircle, Check, RefreshCw } from "lucide-react";
+import { Sliders, Sparkles, Cpu, X, HelpCircle, Check, RefreshCw, Key } from "lucide-react";
 import { ModelSettings } from "@/lib/types";
 
 interface AIStudioDrawerProps {
@@ -13,10 +13,24 @@ interface AIStudioDrawerProps {
 
 const MODELS = [
   {
+    id: "gemini-2-0-flash",
+    name: "Gemini 2.0 Flash (Fast & Fluid)",
+    provider: "Google AI Studio",
+    badge: "Ultra Low Latency",
+    description: "Sub-second response speed for real-time iterative preview and multi-agent synthesis.",
+  },
+  {
+    id: "gemini-2-0-pro",
+    name: "Gemini 2.0 Pro Experimental",
+    provider: "Google AI Studio",
+    badge: "2M Context",
+    description: "Deep full-stack architectural reasoning with massive context window.",
+  },
+  {
     id: "claude-3-7-sonnet",
     name: "Claude 3.7 Sonnet (Hybrid Reasoning)",
     provider: "Anthropic",
-    badge: "Recommended for Multi-Agent",
+    badge: "Multi-Agent Power",
     description: "Deep thinking + instant code generation with superior architectural coherence.",
   },
   {
@@ -24,33 +38,12 @@ const MODELS = [
     name: "Claude 3.5 Sonnet",
     provider: "Anthropic",
     badge: "Fast Code",
-    description: "Benchmark leader for React component generation and UI aesthetics.",
-  },
-  {
-    id: "gemini-2-0-pro",
-    name: "Gemini 2.0 Pro Experimental",
-    provider: "Google AI Studio",
-    badge: "2M Context",
-    description: "Massive context window ideal for full-stack monorepos and multi-file diffs.",
-  },
-  {
-    id: "gemini-2-0-flash",
-    name: "Gemini 2.0 Flash",
-    provider: "Google AI Studio",
-    badge: "Ultra Low Latency",
-    description: "Sub-second response speed for real-time iterative preview edits.",
-  },
-  {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    provider: "OpenAI",
-    badge: "Multimodal",
-    description: "Versatile full-stack reasoning with comprehensive library knowledge.",
+    description: "Benchmark leader for React component generation and agency-level UI aesthetics.",
   },
 ];
 
 export const defaultModelSettings: ModelSettings = {
-  modelId: "claude-3-7-sonnet",
+  modelId: "gemini-2-0-flash",
   temperature: 0.2,
   topP: 0.95,
   systemPrompt: `You are an elite design agency architect and senior full-stack engineer.
@@ -60,6 +53,7 @@ export const defaultModelSettings: ModelSettings = {
 - Return clean, modular React components with Tailwind CSS.`,
   creativityLevel: "balanced",
   tokenBudget: 8192,
+  apiKey: "",
 };
 
 export function AIStudioDrawer({ isOpen, onClose, settings, onChange }: AIStudioDrawerProps) {
@@ -98,7 +92,7 @@ export function AIStudioDrawer({ isOpen, onClose, settings, onChange }: AIStudio
                     Playground
                   </span>
                 </h3>
-                <p className="text-[11px] text-zinc-400">Configure model runtime, temperature, and agent instructions</p>
+                <p className="text-[11px] text-zinc-400">Configure model runtime, temperature, and API keys</p>
               </div>
             </div>
             <button
@@ -111,6 +105,27 @@ export function AIStudioDrawer({ isOpen, onClose, settings, onChange }: AIStudio
 
           {/* Form controls */}
           <div className="p-5 space-y-6">
+            {/* API Key Configuration */}
+            <div className="space-y-2 bg-zinc-900/60 border border-zinc-800/80 p-3.5 rounded-xl">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-blue-400" />
+                  <span>API Key (Gemini or Anthropic)</span>
+                </label>
+                <span className="text-[10px] text-zinc-500 font-mono">Optional Override</span>
+              </div>
+              <input
+                type="password"
+                placeholder="sk-ant-... or AIzaSy... (reads from .env by default)"
+                value={settings.apiKey || ""}
+                onChange={(e) => onChange({ ...settings, apiKey: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-200 font-mono placeholder-zinc-600 focus:outline-none focus:border-blue-500"
+              />
+              <p className="text-[11px] text-zinc-400 leading-tight">
+                Leave blank to automatically use <code className="text-zinc-300">GEMINI_API_KEY</code> or <code className="text-zinc-300">ANTHROPIC_API_KEY</code> from your server's <code className="text-zinc-300">.env</code>.
+              </p>
+            </div>
+
             {/* Model Selection */}
             <div className="space-y-2.5">
               <label className="text-xs font-semibold text-zinc-200 flex items-center justify-between">
@@ -168,7 +183,7 @@ export function AIStudioDrawer({ isOpen, onClose, settings, onChange }: AIStudio
                 className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
               />
               <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
-                <span>0.0 (Strict AST / Code)</span>
+                <span>0.0 (Strict Code)</span>
                 <span>0.5 (Balanced)</span>
                 <span>1.0 (Creative UI)</span>
               </div>
@@ -229,4 +244,3 @@ export function AIStudioDrawer({ isOpen, onClose, settings, onChange }: AIStudio
     </div>
   );
 }
-
