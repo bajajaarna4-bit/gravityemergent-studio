@@ -53,6 +53,19 @@ export function LivePreviewFrame({
   // Transform raw React code: strip all imports and export default
   const cleanCode = React.useMemo(() => {
     if (!rawCode) return "";
+
+    // Extract all imported icons and symbols before stripping imports
+    const importedIdentifiers = new Set<string>();
+    rawCode.replace(/import\s*\{([^}]+)\}\s*from/g, (_match, names) => {
+      names.split(",").forEach((n: string) => {
+        const trimmed = n.trim().split(/\s+as\s+/)[0].trim();
+        if (trimmed && !["React", "useState", "useEffect", "useRef", "useMemo", "useCallback"].includes(trimmed)) {
+          importedIdentifiers.add(trimmed);
+        }
+      });
+      return "";
+    });
+
     let code = rawCode;
     // Strip multi-line and single-line import statements across all lines
     code = code.replace(/import[\s\S]*?from\s+['"][^'"]*?['"];?/g, "");
@@ -81,7 +94,13 @@ export function LivePreviewFrame({
 
     // Replace any remaining standalone exports
     code = code.replace(/export\s*\{[\s\S]*?\};?/g, "");
-    return code;
+
+    // Prepend declared icon variables so they never throw ReferenceError
+    const iconDeclarations = Array.from(importedIdentifiers)
+      .map((name) => `var ${name} = typeof makeIcon === "function" ? makeIcon("${name}") : function(p) { return React.createElement("svg", p); };`)
+      .join("\n");
+
+    return iconDeclarations + "\n" + code;
   }, [rawCode]);
 
   // Bi-directional click-to-edit listener
@@ -221,7 +240,22 @@ export function LivePreviewFrame({
       Github: '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>',
       Shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
       Layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12.5-9.17 4.16a2 2 0 0 1-1.66 0L2 12.5"/><path d="m22 17.5-9.17 4.16a2 2 0 0 1-1.66 0L2 17.5"/>',
-      Code2: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'
+      Code2: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+      Disc: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1"/>',
+      Music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+      ListMusic: '<path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/>',
+      SkipBack: '<polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/>',
+      SkipForward: '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/>',
+      Shuffle: '<path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.4c1.3 0 2.5.6 3.3 1.7l6.1 8.6c.7 1.1 2 1.7 3.3 1.7H22"/><path d="m18 20 4-4-4-4"/>',
+      Repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+      Volume1: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+      Radio: '<circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>',
+      Sliders: '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/>',
+      Mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
+      MicOff: '<line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/>',
+      Monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
+      PhoneOff: '<path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="22" x2="2" y1="2" y2="22"/>',
+      Eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>'
     };
 
     function makeIcon(name) {
@@ -300,14 +334,14 @@ export function LivePreviewFrame({
         window.module = module;
 
         // Evaluate transformed code
-        var fn = new Function('React', 'ReactDOM', 'useState', 'useEffect', 'useRef', 'useMemo', 'IconProxy', 'window', 'exports', 'module', 
+        var fn = new Function('React', 'ReactDOM', 'useState', 'useEffect', 'useRef', 'useMemo', 'IconProxy', 'window', 'exports', 'module', 'makeIcon',
           transformed + '\\n return window.__DefaultExport || (typeof App !== "undefined" ? App : null) || (exports && exports.default ? exports.default : null);'
         );
-        var AppComp = fn(React, ReactDOM, useState, useEffect, useRef, useMemo, IconProxy, window, exports, module);
+        var AppComp = fn(React, ReactDOM, useState, useEffect, useRef, useMemo, IconProxy, window, exports, module, makeIcon);
 
         // Fallback: check window for any defined capitalized component
         if (!AppComp && typeof window !== 'undefined') {
-          for (var candidate of ['App', 'Main', 'Home', 'Component', 'Page', 'Workspace', 'Feed', 'ZapGrocer', 'CineVerse', 'PulseTube', 'Prism', 'NexusAI']) {
+          for (var candidate of ['App', 'Main', 'Home', 'Component', 'Page', 'Workspace', 'Feed', 'AuraBeat', 'GatherPulse', 'ZapGrocer', 'CineVerse', 'PulseTube', 'Prism', 'NexusAI']) {
             if (typeof window[candidate] === 'function') {
               AppComp = window[candidate];
               break;
