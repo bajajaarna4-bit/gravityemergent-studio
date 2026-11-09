@@ -5,6 +5,7 @@ import { videoPlatformSpec, videoPlatformFiles } from "./video-platform";
 import { socialFeedSpec, socialFeedFiles } from "./social-feed";
 import { portfolioSpec, portfolioFiles } from "./portfolio";
 import { saasModernSpec, saasModernFiles } from "./saas-modern";
+import { virtualOfficeSpec, virtualOfficeFiles } from "./virtual-office";
 
 export interface TemplateDefinition {
   id: string;
@@ -78,11 +79,31 @@ export const TEMPLATES: TemplateDefinition[] = [
     spec: saasModernSpec,
     files: saasModernFiles,
   },
+  {
+    id: "virtual-office",
+    genre: "saas",
+    name: "GatherPulse AI (Virtual Office)",
+    description: "Spatial remote headquarters with interactive floorplan, live audio huddle, screen-share preview, and presence.",
+    badge: "Spatial AI",
+    previewThumbnail: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=80",
+    spec: virtualOfficeSpec,
+    files: virtualOfficeFiles,
+  },
 ];
 
 export function getTemplateByGenre(genre: SiteGenre): TemplateDefinition {
   const match = TEMPLATES.find((t) => t.genre === genre);
   return match || TEMPLATES[0];
+}
+
+export function getTemplateByPrompt(prompt: string): TemplateDefinition {
+  const lower = prompt.toLowerCase();
+  if (lower.includes("virtual office") || lower.includes("office") || lower.includes("workspace") || lower.includes("remote team") || lower.includes("gather")) {
+    const vo = TEMPLATES.find((t) => t.id === "virtual-office");
+    if (vo) return vo;
+  }
+  const genre = detectGenreFromPrompt(prompt);
+  return getTemplateByGenre(genre);
 }
 
 export function detectGenreFromPrompt(prompt: string): SiteGenre {

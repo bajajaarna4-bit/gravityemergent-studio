@@ -15,7 +15,7 @@ import {
   VersionSnapshot, 
   ClickToEditTarget 
 } from "@/lib/types";
-import { TEMPLATES } from "@/lib/templates";
+import { TEMPLATES, getTemplateByPrompt } from "@/lib/templates";
 import { generateInitialPlan } from "@/lib/agents/orchestrator";
 import { classifyGenre } from "@/lib/llm/agents";
 import { generateId } from "@/lib/utils";
@@ -42,8 +42,8 @@ export default function Home() {
     setView("workspace");
 
     const genre = classifyGenre(promptText);
-    const baseTemplate = TEMPLATES.find((t) => t.genre === genre) || TEMPLATES[0];
-    const placeholderPlan = planOverride || generateInitialPlan(promptText, modelSettings);
+    const baseTemplate = getTemplateByPrompt(promptText);
+    const placeholderPlan = planOverride || baseTemplate.spec;
     setActiveSpec(placeholderPlan);
     // Immediately prime virtual files with genre template so preview is responsive instantly
     setFiles(baseTemplate.files);
@@ -288,7 +288,11 @@ export default function Home() {
       const data = await res.json();
 
       if (data.success && data.updatedCode) {
-        const updatedFiles: VirtualFileMap = {
+        if (data.spec) {
+          setActiveSpec(data.spec);
+        }
+
+        const finalFiles: VirtualFileMap = data.files || {
           ...files,
           "/App.js": {
             path: "/App.js",
@@ -297,8 +301,7 @@ export default function Home() {
             isModified: true,
           },
         };
-
-        setFiles(updatedFiles);
+        setFiles(finalFiles);
 
         // Add QA/Fixer activity
         const fixActivity: AgentActivityItem = {
@@ -318,9 +321,9 @@ export default function Home() {
           {
             id: generateId("msg"),
             sender: "assistant",
-            content: targetedElement
+            content: data.summary || (targetedElement
               ? `I've updated the <${targetedElement.tagName}> component according to your instruction. Live in preview!`
-              : `Applied updates for "${userPrompt}". /App.js re-compiled.`,
+              : `Applied updates for "${userPrompt}". /App.js re-compiled.`),
             timestamp: Date.now(),
             affectedFiles: ["/App.js"],
             targetedElement,
@@ -334,7 +337,7 @@ export default function Home() {
             timestamp: Date.now(),
             label: `v1.${prev.length} — ${userPrompt.slice(0, 24)}...`,
             promptDescription: userPrompt,
-            files: updatedFiles,
+            files: finalFiles,
           },
           ...prev,
         ]);
