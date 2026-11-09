@@ -93,6 +93,8 @@ RULES:
         success: true,
         updatedCode: appCode,
         affectedFiles: ["/App.js"],
+        spec: tmpl.spec,
+        files: tmpl.files,
         summary: `Synthesized **${tmpl.name}** layout. (Smart Offline Engine active. Add GEMINI_API_KEY in AI Studio settings for custom LLM prompts.)`,
       });
     }
