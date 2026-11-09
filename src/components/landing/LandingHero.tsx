@@ -14,6 +14,7 @@ interface LandingHeroProps {
 }
 
 const EXAMPLE_CHIPS = [
+  { label: "🎵 Spotify Music Streaming", prompt: "A Spotify-style music streaming platform with persistent bottom playback bar, track queue scrubber, and curated playlists" },
   { label: "🏢 Spatial AI Virtual Office", prompt: "A Gather-style spatial virtual office with interactive floorplan, live audio huddle, screen-share preview, and team presence" },
   { label: "🥦 10-Min Grocery Delivery", prompt: "A Blinkit-style ultra-fast 10-minute grocery delivery app with category chips, sticky cart, and live courier map" },
   { label: "🎬 Movie Streaming Platform", prompt: "A Netflix-style 4K cinematic streaming platform with billboard hero, sound toggle, horizontal rails, and watchlist" },

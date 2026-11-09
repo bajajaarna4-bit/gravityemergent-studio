@@ -67,8 +67,13 @@ RULES:
     // Offline Smart Code Patcher & Synthesizer (when external cloud LLM key is not yet configured)
     const lowerPrompt = userPrompt.toLowerCase();
 
-    // 1. Check if the user is asking to synthesize a whole new site or concept (e.g. "ai virtual office build")
+    // 1. Check if the user is asking to synthesize a whole new site or concept (e.g. "ai virtual office build", "spotify app")
     if (
+      lowerPrompt.includes("spotify") ||
+      lowerPrompt.includes("music") ||
+      lowerPrompt.includes("song") ||
+      lowerPrompt.includes("audio") ||
+      lowerPrompt.includes("playlist") ||
       lowerPrompt.includes("virtual office") || 
       lowerPrompt.includes("office") || 
       lowerPrompt.includes("remote team") || 

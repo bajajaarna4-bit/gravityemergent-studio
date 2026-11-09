@@ -6,6 +6,7 @@ import { socialFeedSpec, socialFeedFiles } from "./social-feed";
 import { portfolioSpec, portfolioFiles } from "./portfolio";
 import { saasModernSpec, saasModernFiles } from "./saas-modern";
 import { virtualOfficeSpec, virtualOfficeFiles } from "./virtual-office";
+import { spotifySpec, spotifyFiles } from "./spotify-stream";
 
 export interface TemplateDefinition {
   id: string;
@@ -89,6 +90,16 @@ export const TEMPLATES: TemplateDefinition[] = [
     spec: virtualOfficeSpec,
     files: virtualOfficeFiles,
   },
+  {
+    id: "spotify-audio-stream",
+    genre: "streaming",
+    name: "AuraBeat (Spotify Music)",
+    description: "Spotify-style music streaming platform with persistent playback bar, queue scrubber, and curated playlists.",
+    badge: "Hi-Fi Audio",
+    previewThumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80",
+    spec: spotifySpec,
+    files: spotifyFiles,
+  },
 ];
 
 export function getTemplateByGenre(genre: SiteGenre): TemplateDefinition {
@@ -98,6 +109,10 @@ export function getTemplateByGenre(genre: SiteGenre): TemplateDefinition {
 
 export function getTemplateByPrompt(prompt: string): TemplateDefinition {
   const lower = prompt.toLowerCase();
+  if (lower.includes("spotify") || lower.includes("music") || lower.includes("song") || lower.includes("audio") || lower.includes("playlist") || lower.includes("track") || lower.includes("album")) {
+    const spot = TEMPLATES.find((t) => t.id === "spotify-audio-stream");
+    if (spot) return spot;
+  }
   if (lower.includes("virtual office") || lower.includes("office") || lower.includes("workspace") || lower.includes("remote team") || lower.includes("gather")) {
     const vo = TEMPLATES.find((t) => t.id === "virtual-office");
     if (vo) return vo;
@@ -108,6 +123,9 @@ export function getTemplateByPrompt(prompt: string): TemplateDefinition {
 
 export function detectGenreFromPrompt(prompt: string): SiteGenre {
   const lower = prompt.toLowerCase();
+  if (lower.includes("spotify") || lower.includes("music") || lower.includes("song") || lower.includes("audio") || lower.includes("playlist")) {
+    return "streaming";
+  }
   if (lower.includes("grocery") || lower.includes("blinkit") || lower.includes("zepto") || lower.includes("food delivery") || lower.includes("10 min")) {
     return "quick-commerce";
   }

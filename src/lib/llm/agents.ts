@@ -16,6 +16,9 @@ export type StreamCallback = (event: MultiAgentStreamEvent) => void;
 // 1. Genre Classification & Rules
 export function classifyGenre(prompt: string): "quick-commerce" | "streaming" | "video" | "social" | "portfolio" | "saas" {
   const p = prompt.toLowerCase();
+  if (p.includes("spotify") || p.includes("music") || p.includes("song") || p.includes("audio") || p.includes("playlist") || p.includes("podcast") || p.includes("track")) {
+    return "streaming";
+  }
   if (p.includes("grocery") || p.includes("blinkit") || p.includes("zepto") || p.includes("instamart") || p.includes("10 min") || p.includes("delivery") || p.includes("food delivery") || p.includes("supermarket")) {
     return "quick-commerce";
   }
