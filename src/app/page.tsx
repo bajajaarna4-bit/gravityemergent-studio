@@ -42,8 +42,11 @@ export default function Home() {
     setView("workspace");
 
     const genre = classifyGenre(promptText);
+    const baseTemplate = TEMPLATES.find((t) => t.genre === genre) || TEMPLATES[0];
     const placeholderPlan = planOverride || generateInitialPlan(promptText, modelSettings);
     setActiveSpec(placeholderPlan);
+    // Immediately prime virtual files with genre template so preview is responsive instantly
+    setFiles(baseTemplate.files);
 
     // Initial chat message
     setMessages([

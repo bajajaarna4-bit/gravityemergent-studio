@@ -57,12 +57,28 @@ export function LivePreviewFrame({
     // Strip multi-line and single-line import statements across all lines
     code = code.replace(/import[\s\S]*?from\s+['"][^'"]*?['"];?/g, "");
     code = code.replace(/import\s+['"][^'"]*?['"];?/g, "");
-    // Replace export default function App with function App
-    code = code.replace(/export\s+default\s+function\s+([A-Za-z0-9_$]+)/g, "function $1");
-    // Replace export default const App = ...
-    code = code.replace(/export\s+default\s+/g, "const App = ");
-    // Replace export const / let / var
+
+    // Transform export default function [Name]
+    code = code.replace(/export\s+default\s+function(?:\s+([A-Za-z0-9_$]+))?\s*\(/g, (_match, name) => {
+      const fnName = name || '__AnonymousApp';
+      return `window.__DefaultExport = ${fnName};\nfunction ${fnName}(`;
+    });
+
+    // Transform export default class [Name]
+    code = code.replace(/export\s+default\s+class(?:\s+([A-Za-z0-9_$]+))?/g, (_match, name) => {
+      const clsName = name || '__AnonymousClass';
+      return `window.__DefaultExport = ${clsName};\nclass ${clsName}`;
+    });
+
+    // Transform export default <identifier>;
+    code = code.replace(/export\s+default\s+([A-Za-z0-9_$]+)\s*;?/g, "window.__DefaultExport = $1;");
+
+    // Catch any remaining export default ...
+    code = code.replace(/export\s+default\s+/g, "window.__DefaultExport = ");
+
+    // Replace export const / let / var / function / class
     code = code.replace(/export\s+(const|let|var|function|class)/g, "$1");
+
     // Replace any remaining standalone exports
     code = code.replace(/export\s*\{[\s\S]*?\};?/g, "");
     return code;
@@ -256,14 +272,48 @@ export function LivePreviewFrame({
 
       var codeToRun = decodeURIComponent("${encodedCode}");
 
+      // If code is empty or loading
+      if (!codeToRun || !codeToRun.trim()) {
+        var rootEl = document.getElementById('root');
+        if (rootEl) {
+          rootEl.innerHTML = 
+            '<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #a1a1aa; font-family: sans-serif; font-size: 13px;">' +
+              '<div style="text-align: center;">' +
+                '<div style="display: inline-block; width: 28px; height: 28px; border: 2px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px;"></div>' +
+                '<div style="font-weight: 500; color: #f4f4f5; margin-bottom: 4px;">Synthesizing Prototype...</div>' +
+                '<div style="font-size: 12px; color: #71717a;">Multi-agent pipeline is generating component hierarchy & Tailwind classes</div>' +
+              '</div>' +
+              '<style>@keyframes spin { to { transform: rotate(360deg); } }</style>' +
+            '</div>';
+        }
+        return;
+      }
+
       try {
         var transformed = Babel.transform(codeToRun, {
           presets: ['react']
         }).code;
 
+        var exports = {};
+        var module = { exports: {} };
+        window.exports = exports;
+        window.module = module;
+
         // Evaluate transformed code
-        var fn = new Function('React', 'ReactDOM', 'useState', 'useEffect', 'useRef', 'useMemo', 'IconProxy', transformed + '\\n return typeof App !== "undefined" ? App : null;');
-        var AppComp = fn(React, ReactDOM, useState, useEffect, useRef, useMemo, IconProxy);
+        var fn = new Function('React', 'ReactDOM', 'useState', 'useEffect', 'useRef', 'useMemo', 'IconProxy', 'window', 'exports', 'module', 
+          transformed + '\\n return window.__DefaultExport || (typeof App !== "undefined" ? App : null) || (exports && exports.default ? exports.default : null);'
+        );
+        var AppComp = fn(React, ReactDOM, useState, useEffect, useRef, useMemo, IconProxy, window, exports, module);
+
+        // Fallback: check window for any defined capitalized component
+        if (!AppComp && typeof window !== 'undefined') {
+          for (var candidate of ['App', 'Main', 'Home', 'Component', 'Page', 'Workspace', 'Feed', 'ZapGrocer', 'CineVerse', 'PulseTube', 'Prism', 'NexusAI']) {
+            if (typeof window[candidate] === 'function') {
+              AppComp = window[candidate];
+              break;
+            }
+          }
+        }
 
         if (AppComp) {
           var rootEl = document.getElementById('root');
